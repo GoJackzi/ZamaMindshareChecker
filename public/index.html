@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>ZAMA S5 Mindshare Checker</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-overlay: rgba(255,255,255,0.08);
+    --card: #fffaf0;
+    --card-border: rgba(19,33,60,0.08);
+    --muted: #42526b;
+    --accent1: #ffd54f; /* Simpson yellow */
+    --accent2: #ffb300; /* Simpson orange */
+    --accent3: #f57c00;
+    --text: #13213c;
+    --ok: #2ecc71;
+    --bad: #e74c3c;
+    --footer-h: 72px;
+    --footer-transition: 220ms;
+    --vignette-alpha: 0.22;
+    --noise-opacity: 0.02;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;color:var(--text);-webkit-font-smoothing:antialiased;}
+  body { background-color: #7db7f5; min-height:100vh; color: var(--text); }
+
+  #app {
+    min-height:100dvh; display:flex; flex-direction:column;
+    background-image: url("simpsons-bg.jpg");
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    position:relative; overflow-x:hidden;
+  }
+  #app::after{
+    content: ""; position: fixed; left: 0; right: 0; top: 0; bottom: 0; pointer-events: none;
+    background: var(--bg-overlay);
+    z-index: 0;
+  }
+  #app::before{
+    content: ""; position: fixed; left:0; right:0; bottom:0; height: 42vh; pointer-events: none;
+    background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,var(--vignette-alpha)) 100%); z-index: 0;
+  }
+
+  .wrap{ position:relative; z-index: 2; max-width:980px; margin:24px auto; padding:20px 20px 20px;
+    padding-bottom: calc(var(--footer-h) + env(safe-area-inset-bottom, 0px) + 12px);
+    flex:1; display:flex; flex-direction:column; transition:padding-bottom .12s ease; }
+  .wrap.centered{ justify-content:center; }
+
+  .topbar{display:flex;align-items:center;justify-content:flex-start;gap:12px; z-index:2}
+  .brand{display:flex;gap:12px;align-items:center}
+  .logo{width:52px;height:52px;border-radius:14px;overflow:hidden;background:linear-gradient(135deg,var(--accent1),var(--accent2));display:flex;align-items:center;justify-content:center;box-shadow:0 10px 30px rgba(0,0,0,0.18); border:2px solid rgba(255,255,255,0.6)}
+  .logo img{width:100%;height:100%;object-fit:cover}
+  h1{margin:0;font-size:20px}
+  .subtitle{color:var(--muted);font-size:13px;margin-top:2px;font-weight:600}
+
+  .skip-link{position:absolute;left:-9999px;top:auto;background:#061020;color:white;padding:8px 12px;border-radius:8px;z-index:9999}
+  .skip-link:focus{ left:12px; top:12px; outline:3px solid rgba(255,215,75,0.18); }
+
+  .search-shell{margin-top:16px;background: rgba(255,255,255,0.82); padding:18px;border-radius:16px;border:1px solid rgba(19,33,60,0.08); box-shadow: 0 16px 40px rgba(19,33,60,0.12); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+  .search-row{display:flex;gap:12px;align-items:center}
+  .search-inner{flex:1;min-width:0}
+  input[type="text"]{ width:100%; padding:14px 16px; border-radius:12px; border:1px solid rgba(19,33,60,0.12); background:rgba(255,255,255,0.92); color:var(--text); font-size:16px; height:56px; outline:none; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);}
+
+  .actions{display:flex;gap:12px;align-items:center;flex:0 0 auto}
+  .btn{padding:12px 18px;border-radius:14px;border:0;cursor:pointer;font-weight:800;display:inline-flex;align-items:center;justify-content:center;min-height:48px; transition: transform 120ms ease, box-shadow 120ms ease;}
+  .btn:focus{ outline: 3px solid rgba(255,215,75,0.14); outline-offset:2px; }
+  .btn-search{
+    background: url('btn-dont-push.jpg') center/cover no-repeat;
+    color: transparent;
+    box-shadow: 0 10px 22px rgba(0,0,0,0.18);
+    min-width:124px;
+    border: 0;
+    border-radius:999px;
+    text-shadow: none;
+  }
+  .btn-search:hover{
+    transform:translateY(-1px) scale(1.01);
+    box-shadow: 0 12px 26px rgba(0,0,0,0.24);
+  }
+  .btn-clear{background:rgba(255,255,255,0.7);border:1px solid rgba(19,33,60,0.12);color:var(--muted);min-width:88px; box-shadow:0 6px 16px rgba(0,0,0,0.08);}
+  .btn-clear:hover{transform:translateY(-1px);}
+  .graph-container{margin-top:18px;background: rgba(255,255,255,0.9); padding:20px;border-radius:14px;border:1px solid var(--card-border);box-shadow:0 10px 26px rgba(19,33,60,0.12); z-index:2}
+  .graph-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+  .graph-title{font-size:16px;font-weight:700;margin:0;color:var(--text)}
+  .graph-canvas-wrapper{position:relative;width:100%;height:auto;overflow-x:auto}
+  .leaderboard-table{width:100%; border-collapse:collapse;}
+  .leaderboard-table th, .leaderboard-table td{padding:10px 12px; text-align:left; font-size:13px; color:var(--text);}
+  .leaderboard-table th{color:var(--muted); font-weight:700; border-bottom:1px solid rgba(19,33,60,0.1);}
+  .leaderboard-table tr + tr td{border-top:1px solid rgba(19,33,60,0.06);}
+  .leaderboard-rank{font-weight:800; color:var(--accent2);}
+  .leaderboard-handle{font-weight:700;}
+  .leaderboard-ms{font-variant-numeric:tabular-nums;}
+  .leaderboard-delta.up{color:var(--ok); font-weight:800;}
+  .leaderboard-delta.down{color:var(--bad); font-weight:800;}
+  .leaderboard-delta.same{color:var(--muted); font-weight:800;}
+  .info-box{margin-top:12px; padding:12px 14px; background:rgba(255,255,255,0.9); border:1px solid var(--card-border); border-radius:12px; box-shadow:0 8px 22px rgba(19,33,60,0.12); color:var(--muted); font-weight:700; line-height:1.5;}
+
+  .results{margin-top:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;align-items:start}
+  @media (min-width: 900px) {
+    .results {
+      grid-template-columns: repeat(3, minmax(260px, 1fr));
+    }
+  }
+
+  .card{background: var(--card); padding:18px;border-radius:14px;border:1px solid var(--card-border);box-shadow:0 12px 30px rgba(19,33,60,0.12); z-index:2}
+  .card h3{margin:0 0 10px;font-size:14px;color:var(--text)}
+  .row{display:flex;justify-content:space-between;align-items:center;margin:8px 0}
+  .label{color:var(--muted);font-size:13px;font-weight:600}
+  .value{font-size:20px;font-weight:800; font-variant-numeric: tabular-nums; color:var(--text);}
+  .value.mindshare{ font-size:20px; color:var(--accent2); text-align:right; white-space:nowrap; }
+  .badge{display:inline-block;padding:6px 10px;border-radius:999px;font-weight:700;font-size:13px}
+  .badge.ok{background:rgba(255,211,79,0.18);color:#a45a00;border:1px solid rgba(255,211,79,0.35)}
+
+  .progress-shell{height:12px;background:rgba(255,255,255,0.03);border-radius:999px;overflow:hidden}
+  .progress-bar{height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,var(--accent1),var(--accent2));transition:width .6s ease}
+
+  .ms-change{display:inline-flex;gap:8px;align-items:center;font-weight:800;white-space:nowrap;font-variant-numeric: tabular-nums}
+  .ms-change.up{color:var(--ok)} .ms-change.down{color:var(--bad)}
+  .ms-change .abs{font-weight:700;color:var(--muted);font-size:0.95em;margin-left:6px}
+  hr.sep{border:none;border-top:1px solid rgba(19,33,60,0.08);margin:10px 0}
+  .results-empty{color:var(--muted);margin-top:16px}
+
+  footer.site-footer{
+    position:fixed; left:0; right:0; bottom:0; height: var(--footer-h);
+    display:flex; align-items:center; justify-content:flex-start; padding:12px 18px;
+    background: transparent;
+    border-top: none; box-shadow: none;
+    z-index:40; transform: translateY(0); transition: transform var(--footer-transition) cubic-bezier(.22,.9,.28,1);
+    will-change: transform; backdrop-filter: none; -webkit-backdrop-filter: none; overflow: visible;
+  }
+  footer.site-footer::before{ display:none; }
+  footer.site-footer.hidden::before { display:none !important; } footer.site-footer.hidden { transform: translateY(calc(100% + env(safe-area-inset-bottom, 0px))); }
+  .footer-inner{max-width:940px;width:100%;display:flex;align-items:center;justify-content:flex-start;gap:12px;color:var(--muted);font-size:14px}
+  .footer-text{flex:1; min-width:0}
+  a.powered{ text-decoration:none;color:inherit;display:flex;gap:12px;align-items:center;flex:0 0 auto}
+  a.powered img{ width:56px; height:56px; border-radius:8px; object-fit:cover; box-shadow:0 8px 22px rgba(0,0,0,0.45) }
+
+  .toast{ position:fixed; left:50%; transform:translateX(-50%); bottom: calc(var(--footer-h) + 16px); background: #061020; color: #fff; padding:8px 12px; border-radius:10px; box-shadow: 0 8px 30px rgba(0,0,0,0.5); z-index:12000; font-weight:600; opacity:0; transition:opacity 180ms ease, transform 180ms ease; will-change:opacity, transform; }
+  .toast.show{ opacity: 1; transform: translateX(-50%) translateY(-6px); }
+
+  :focus:not(:focus-visible) { outline: none; }
+  @media (max-width:760px){ h1{font-size:18px} }
+  @media (max-width:560px){
+    .search-row{flex-direction:column;align-items:stretch} .search-inner{width:100%}
+    .actions{flex-wrap:nowrap;justify-content:space-between} .btn{flex:1 1 auto; min-width:0} .btn + .btn{margin-left:8px}
+    .footer-inner{padding:0 6px; font-size:13px} a.powered img{width:48px;height:48px} :root{ --footer-h:64px; }
+  }
+  @media (max-height:520px){ .wrap{ padding-bottom: calc(var(--footer-h) + env(safe-area-inset-bottom,0px) + 6px); } }
+  @media (prefers-reduced-motion: reduce){ * { transition: none !important; animation: none !important; scroll-behavior: auto !important; } .toast{ transition:none; } }
+</style>
+</head>
+<body>
+  <a href="#username" class="skip-link">Skip to search</a>
+
+  <div id="app" role="application" aria-label="Zama Rank app">
+    <div class="wrap" id="wrap">
+      <div class="topbar" role="banner">
+        <div class="brand" aria-hidden="false">
+          <div class="logo" aria-hidden="true"><img id="logoImg" src="zama-logo.png" alt=""></div>
+          <div><h1>ZAMA S5 Mindshare Checker</h1><div class="subtitle">Insert X handle (e.g. @tardhus or tardhus)</div></div>
+        </div>
+      </div>
+
+      <form class="search-shell" role="search" aria-label="Search X handle" onsubmit="return false;">
+        <div class="search-row">
+          <div class="search-inner">
+            <label for="username" class="sr-only" style="position:absolute;left:-9999px">Search handle</label>
+            <input id="username" type="text" placeholder="@your_handle" aria-label="Search handle" autocomplete="off" />
+          </div>
+          <div class="actions" role="group" aria-label="Search actions">
+            <button id="searchBtn" class="btn btn-search" aria-label="Search">🔎 Search</button>
+            <button id="clearBtn" class="btn btn-clear" aria-label="Clear search">Clear</button>
+          </div>
+        </div>
+      </form>
+
+      <div id="resultStatus" aria-live="polite" aria-atomic="true" style="position:absolute;left:-9999px;top:auto;"></div>
+      <div id="resultArea" class="results" role="region" aria-live="polite" aria-label="Search results" style="display:none"></div>
+      <div id="leaderboard" class="graph-container" style="display:none" role="region" aria-label="Live leaderboard"></div>
+      <div id="infoBox" class="info-box">
+        <div>1. Rewards are limited to the Top 1,000.</div>
+        <div>2. Snapshot will be taken on 31st of December at 23:59:59 AoE (Anywhere on Earth).</div>
+      </div>
+      <div id="emptyHint" class="results-empty" role="status">Search to show data</div>
+    </div>
+
+    <footer class="site-footer" id="siteFooter" aria-hidden="false" role="contentinfo">
+      <div class="footer-inner">
+        <div class="footer-text" id="footerText">With 💛 by <a href="https://x.com/tardhus" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;font-weight:700;">Musky</a></div>
+      </div>
+    </footer>
+  </div>
+
+
+<script>
+/* -------- CONFIG -------- */
+const API_BASE = '/api/check';
+const TOTAL_FETCHED = 1500;
+const OG_NFT_TOP = 1006;
+const SHARE_TOP = 100;
+
+
+/* cache */
+const resultsCache = new Map();
+
+/* helpers */
+const $ = id => document.getElementById(id);
+function money(n){ if(n==null || !isFinite(Number(n))) return '-'; return '$' + Number(n).toLocaleString(); }
+function fmtNum(n, d=6){ if(n==null || !isFinite(Number(n))) return '-'; return Number(n).toFixed(d); }
+function progressToTop100(rank){
+  if(!isFinite(rank)) return 0;
+  rank = Number(rank);
+  if(rank <= 100) return Math.max(0, Math.min(1, (100-rank)/99));
+  return Math.max(0, Math.min(1, (1500-rank)/(1500-100)));
+}
+
+/* 🔥 NEW: compute change from delta (with fallbacks) */
+function computePeriodChange(meta) {
+  const curr = Number(meta?.mindshare);
+
+  // try several possible field names, fall back to 0
+  let delta = meta?.mindshareDelta;
+  if (delta == null) delta = meta?.mindshare_delta;
+  if (delta == null) delta = meta?.delta;
+  if (delta == null) delta = 0;
+
+  delta = Number(delta);
+
+  if (!isFinite(curr) || !isFinite(delta)) {
+    // treat as no change instead of "-"
+    return { dir: 'same', pctText: '0.0%', absText: '', pct: 0, abs: 0 };
+  }
+
+  const prev = curr - delta;
+  const pct  = prev === 0 ? 0 : (delta / Math.abs(prev)) * 100;
+
+  const pctRounded = Math.round(pct * 10) / 10;
+  const absRounded = Math.round(delta * 1e6) / 1e6;
+
+  const dir = delta > 0 ? 'up' : delta < 0 ? 'down' : 'same';
+  const pctText = dir === 'same' ? '0.0%' : `${Math.abs(pctRounded)}%`;
+  const absText = absRounded === 0 ? '' : `(${absRounded>0?'+':''}${absRounded})`;
+
+  return { dir, pctText, absText, pct: pctRounded, abs: absRounded };
+}
+
+/* preload images */
+const _pre = {logo:null, avatar:null, bg:null};
+function preloadStatic(){
+  const l = new Image(); l.src='zama-logo.png'; l.onload=()=>_pre.logo=l; l.onerror=()=>_pre.logo=null;
+  const b = new Image(); b.src='simpsons-bg.jpg'; b.onload=()=>_pre.bg=b; b.onerror=()=>_pre.bg=null;
+}
+preloadStatic();
+
+async function loadAvatar(handle){
+  return new Promise(resolve=>{
+    const img = new Image(); img.crossOrigin='anonymous';
+    img.onload = ()=>{ _pre.avatar = img; resolve(true); };
+    img.onerror = ()=>{ _pre.avatar = null; resolve(false); };
+    img.src = `https://unavatar.io/x/${encodeURIComponent(handle)}?fallback=true`;
+  });
+}
+
+/* toast */
+function showToast(msg, ms=2200){
+  const existing = document.querySelector('.toast');
+  if(existing) existing.remove();
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.setAttribute('role','status');
+  t.setAttribute('aria-live','polite');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(()=> t.classList.add('show'));
+  setTimeout(()=> {
+    t.classList.remove('show');
+    setTimeout(()=> t.remove(), 200);
+  }, ms);
+}
+
+/* UI show/hide */
+function hideResults(){
+  $('resultArea').style.display = 'none';
+  $('leaderboard').style.display = 'none';
+  $('emptyHint').style.display='block';
+  $('resultStatus').textContent = 'No results displayed';
+  $('wrap')?.classList.add('centered');
+}
+function showResults(){
+  $('resultArea').style.display = 'grid';
+  $('leaderboard').style.display = 'block';
+  $('emptyHint').style.display='none';
+  $('wrap')?.classList.remove('centered');
+}
+
+/* build card */
+function mkCard(title, meta){
+  const el = document.createElement('div'); el.className='card';
+
+  const found = !!meta && meta.found === true && Number.isFinite(Number(meta.rank));
+  const rank = found ? Number(meta.rank) : null;
+  const ms = found ? meta.mindshare : null;
+
+  const ch = computePeriodChange(found ? meta : {});
+
+  let changeHtml = '-';
+  if(found){
+    if(ch.dir === 'same') {
+      changeHtml = `<span class="ms-change">${ch.pctText}</span>`;
+    } else {
+      const arrow = ch.dir === 'up' ? '▲' : '▼';
+      changeHtml = `<span class="ms-change ${ch.dir}">${arrow} ${ch.pctText}<span class="abs">${ch.absText}</span></span>`;
+    }
+  }
+
+  const mindshareHtml = found ? `<div class="value mindshare">${fmtNum(ms,6)}</div>` : `<div class="value mindshare">-</div>`;
+
+  const labelForChange = 'Mindshare △';
+
+  let badgeHtml = '';
+  if((title==='30d' || title==='month') && found){
+    if(rank <= SHARE_TOP) badgeHtml = `<div style="margin-top:8px"><span class="badge ok">Eligible for OG NFT + Revenue Share</span></div>`;
+    else if(rank <= OG_NFT_TOP) badgeHtml = `<div style="margin-top:8px"><span class="badge ok">Eligible for OG NFT</span></div>`;
+  }
+
+  let payoutSectionHtml = '';
+  if ((title === '30d' || title === 'month') && found && rank <= SHARE_TOP) {
+    const topMin = 1500, topMax=2000, min100=150, max100=260;
+    const t = (Math.min(100, Math.max(1, rank)) - 1)/99;
+    const min = Math.round(topMin + (min100 - topMin)*t);
+    const max = Math.round(topMax + (max100 - topMax)*t);
+    const payoutHtml = `${money(min)} - ${money(max)}`;
+
+    payoutSectionHtml = `
+      <hr class="sep" />
+      <div class="row">
+        <div class="label">Assumed payout (if eligible)</div>
+        <div class="value">${payoutHtml}</div>
+      </div>
+    `;
+  }
+
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3>${title}</h3>
+      <div style="text-align:right;font-weight:800;font-size:20px">${found?rank:'-'}</div>
+    </div>
+    <div class="row"><div class="label">Mindshare</div>${mindshareHtml}</div>
+    <div class="row"><div class="label">${labelForChange}</div><div style="text-align:right">${found? changeHtml : '-'}</div></div>
+    ${badgeHtml}
+    ${payoutSectionHtml}
+  `;
+  return el;
+}
+
+/* fetch and render leaderboard instead of graph */
+let leaderboardData = [];
+let leaderboardExpanded = false;
+
+async function loadAndRenderLeaderboard(){
+  const container = $('leaderboard');
+  if(!container) return;
+  container.innerHTML = `<div style="color:var(--muted);font-weight:700">Loading leaderboard…</div>`;
+  container.style.display = 'block';
+  try{
+    const res = await fetch('/api/top?timeframe=month', { cache: 'no-store' });
+    if(!res.ok || res.status === 204 || res.status === 304) throw new Error('Leaderboard fetch failed');
+    let data;
+    try{
+      data = await res.json();
+    }catch(parseErr){
+      throw new Error('Invalid leaderboard response');
+    }
+    const list = data?.list || [];
+    if(!list.length) throw new Error('No leaderboard data');
+    leaderboardData = list;
+    leaderboardExpanded = false;
+    renderLeaderboard();
+  }catch(err){
+    container.innerHTML = `<div style="color:var(--muted);font-weight:700">Leaderboard unavailable</div>`;
+    console.error(err);
+  }
+}
+
+/* render leaderboard instead of graph */
+function renderLeaderboard(){
+  const container = $('leaderboard');
+  container.innerHTML = '';
+  if(!leaderboardData || !leaderboardData.length){
+    container.style.display = 'none';
+    return;
+  }
+  const entries = leaderboardExpanded ? leaderboardData : leaderboardData.slice(0, 5);
+
+  let html = `
+    <div class="graph-header">
+      <h3 class="graph-title">Live Leaderboard (Top 100 — 30d)</h3>
+      <button class="btn btn-clear" id="lbToggleBtn" style="min-width:120px;">${leaderboardExpanded ? 'Show Top 5' : 'Show Top 100'}</button>
+    </div>
+    <div class="graph-canvas-wrapper">
+      <table class="leaderboard-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Handle</th>
+            <th>Mindshare</th>
+            <th>Mindshare △</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  entries.slice(0, 100).forEach((item, idx) => {
+    const rank = idx + 1;
+    const handle = item.username || '-';
+    const ms = Number.isFinite(item.mindshare) ? Number(item.mindshare).toFixed(6) : '-';
+    const delta = computePeriodChange({ mindshare: item.mindshare, mindshareDelta: item.mindshareDelta });
+    const dirClass = delta.dir === 'up' ? 'up' : delta.dir === 'down' ? 'down' : 'same';
+    const arrow = delta.dir === 'up' ? '▲' : delta.dir === 'down' ? '▼' : '→';
+    const deltaText = delta.dir === 'same' ? '0.0%' : `${arrow} ${delta.pctText}${delta.absText ? ' ' + delta.absText : ''}`;
+
+    html += `
+      <tr>
+        <td class="leaderboard-rank">${rank}</td>
+        <td class="leaderboard-handle">@${handle}</td>
+        <td class="leaderboard-ms">${ms}</td>
+        <td class="leaderboard-delta ${dirClass}">${deltaText}</td>
+      </tr>
+    `;
+  });
+
+  html += `
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  container.innerHTML = html;
+  container.style.display = 'block';
+
+  const toggleBtn = $('lbToggleBtn');
+  if(toggleBtn){
+    toggleBtn.addEventListener('click', ()=>{
+      leaderboardExpanded = !leaderboardExpanded;
+      renderLeaderboard();
+    });
+  }
+}
+
+/* debounce (unused but kept) */
+function debounce(fn, wait){
+  let t = null;
+  return function(...args){ clearTimeout(t); t = setTimeout(()=> fn.apply(this, args), wait); };
+}
+
+let lastSearch = null;
+async function performSearchImmediate(){
+  const raw = ($('username').value||'').trim();
+  if(!raw){ $('username').focus(); return; }
+  const handle = raw.replace(/^@/,'').toLowerCase();
+  showResults(); const status = $('resultStatus'); status.textContent = 'Fetching data…';
+  $('resultArea').innerHTML = '';
+
+  for(let i=0;i<3;i++){
+    const s=document.createElement('div');
+    s.className='card';
+    s.innerHTML = `<h3>Loading…</h3><div style="color:var(--muted);margin-top:6px">Fetching data</div>`;
+    $('resultArea').appendChild(s);
+  }
+
+  await loadAvatar(handle);
+
+  if(resultsCache.has(handle)){
+    const data = resultsCache.get(handle);
+    renderResults(handle, data);
+    status.textContent = `Showing cached results for ${handle}`;
+    lastSearch = { handle, data };
+    return;
+  }
+
+  try{
+    const res = await fetch(`${API_BASE}?username=${encodeURIComponent(handle)}`);
+    if(!res.ok) throw new Error('Network ' + res.status);
+    const data = await res.json();
+    const results = data.results || {};
+    if(!results['30d'] && results['month']) results['30d'] = results['month'];
+    if(!results['month'] && results['30d']) results['month'] = results['30d'];
+    resultsCache.set(handle, data);
+    renderResults(handle, data);
+    status.textContent = `Results loaded for ${handle}`;
+    lastSearch = { handle, data };
+  }catch(err){
+    const el = document.createElement('div');
+    el.className='card';
+    el.innerHTML = `<h3>Error</h3><div style="color:var(--muted);margin-top:6px">${err.message}</div>`;
+    $('resultArea').innerHTML = '';
+    $('resultArea').appendChild(el);
+    status.textContent = `Error fetching results`;
+    lastSearch = null;
+    showToast('Error fetching data');
+  }
+}
+
+const performSearch = debounce(performSearchImmediate, 300);
+
+function renderResults(handle, data){
+  const container = $('resultArea'); container.innerHTML = '';
+  const results = data.results || {};
+  if(!results['30d'] && results['month']) results['30d'] = results['month'];
+  if(!results['month'] && results['30d']) results['month'] = results['30d'];
+
+  const order = ['24h','7d','30d'];
+  for(let i=0;i<order.length;i++){
+    const k = order[i];
+    container.appendChild( mkCard(k, results[k]||{}) );
+  }
+  showResults();
+  loadAndRenderLeaderboard();
+}
+
+
+/* Search / Enter */
+$('searchBtn').addEventListener('click', (e)=> {
+  e.preventDefault();
+  performSearchImmediate();
+});
+$('username').addEventListener('keydown', (e)=>{
+  if(e.key==='Enter'){
+    e.preventDefault();
+    performSearchImmediate();
+  }
+});
+
+/* no auto-search while typing */
+/* $('username').addEventListener('input', (e)=> { performSearch(); }); */
+
+/* Clear */
+$('clearBtn').addEventListener('click', (e)=>{
+  e.preventDefault();
+  $('username').value = '';
+  lastSearch = null;
+  hideResults();
+  showToast('Cleared');
+});
+
+/* footer hide/show */
+(function setupFooterVisibility(){
+  const footer = $('siteFooter'); if(!footer) return;
+  let lastY = window.scrollY || 0; let ticking = false;
+  function onScroll(){
+    const y = window.scrollY || 0;
+    if (y > lastY + 6) {
+      footer.classList.add('hidden');
+    } else if (y < lastY - 6) {
+      footer.classList.remove('hidden');
+    }
+    lastY = y;
+    ticking = false;
+  }
+  window.addEventListener('scroll', function(){
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(onScroll);
+  }, { passive: true });
+  window.addEventListener('touchstart', ()=> footer.classList.remove('hidden'), {passive:true});
+  window.addEventListener('load', ()=> footer.classList.remove('hidden'));
+})();
+
+/* initial */
+hideResults();
+</script>
+</body>
+</html>
