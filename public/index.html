@@ -197,7 +197,12 @@
     .leaderboard-table th, .leaderboard-table td{padding:6px 8px}
   }
   @media (orientation: portrait){
-    #app{background-attachment:scroll}
+    #app{
+      background-attachment:scroll;
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center top;
+    }
     .wrap{max-width:100%; padding:12px; padding-bottom: calc(var(--footer-h) + env(safe-area-inset-bottom, 0px) + 12px);}
     .topbar{justify-content:center}
     .brand{justify-content:center}
