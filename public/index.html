@@ -196,6 +196,22 @@
     .leaderboard-table{font-size:11px}
     .leaderboard-table th, .leaderboard-table td{padding:6px 8px}
   }
+  @media (orientation: portrait){
+    #app{background-attachment:scroll}
+    .wrap{max-width:100%; padding:12px; padding-bottom: calc(var(--footer-h) + env(safe-area-inset-bottom, 0px) + 12px);}
+    .topbar{justify-content:center}
+    .brand{justify-content:center}
+    .search-shell{width:100%}
+    .search-row{flex-direction:column; align-items:stretch; gap:10px}
+    .actions{width:100%; gap:10px}
+    .btn-search, .btn-clear{min-width:100%}
+    .results{grid-template-columns:1fr; gap:14px}
+    .graph-container{width:100%; padding:14px}
+    .graph-header{flex-direction:column; align-items:flex-start; gap:10px}
+    .graph-canvas-wrapper{overflow-x:auto; -webkit-overflow-scrolling:touch}
+    .leaderboard-table{min-width:520px}
+    .info-box{width:100%}
+  }
   @media (max-height:520px){ .wrap{ padding-bottom: calc(var(--footer-h) + env(safe-area-inset-bottom,0px) + 6px); } }
   @media (prefers-reduced-motion: reduce){ * { transition: none !important; animation: none !important; scroll-behavior: auto !important; } .toast{ transition:none; } }
 </style>
